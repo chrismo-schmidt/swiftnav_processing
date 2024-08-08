@@ -1,13 +1,13 @@
 @echo off
-:: This script processes all .sbp files in a specified directory using the sbp2rinex command. Written with the help of ChatGPT.
+REM This script processes all .sbp files in a specified directory using the sbp2rinex command. Written with the help of ChatGPT.
 
-:: Check if the user provided an argument (the directory path)
+REM Check if the user provided an argument (the directory path)
 IF "%~1"=="" (
     echo Usage: %0 [path_to_directory]
     exit /b 1
 )
 
-:: Use the first argument as the directory containing .sbp files
+REM Use the first argument as the directory containing .sbp files
 SET "SBP_DIR=%~1"
 
 REM Check if the directory exists
@@ -28,5 +28,3 @@ FOR %%F IN (*.sbp) DO (
     sbp2rinex "%%F" -d rinex
 )
 
-REM Optional: Pause to keep the command prompt open after execution
-PAUSE
