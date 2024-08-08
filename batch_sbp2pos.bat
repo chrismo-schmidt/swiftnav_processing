@@ -82,7 +82,7 @@ FOR %%F IN (*.sbp) DO (
 	echo.
 )
 
-cd "%CWDIR%"
+cd /d "%CWDIR%"
 echo Finished post-processing! The results can be found in %SBP_DIR%\%SOLUTION_OUT%
 
 
