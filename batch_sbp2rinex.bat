@@ -1,5 +1,8 @@
 @echo off
-REM This script processes all .sbp files in a specified directory using the sbp2rinex command. Written with the help of ChatGPT.
+REM This script processes all .sbp files in a specified directory using the sbp2rinex command. s
+REM Define in-/output directories
+SET "RINEX_OUT=rinex\bike" 
+SET "CWDIR=%CD%"
 
 REM Check if the user provided an argument (the directory path)
 IF "%~1"=="" (
@@ -17,7 +20,7 @@ IF NOT EXIST "%SBP_DIR%" (
 )
 
 :: Create output directory
-mkdir "%SBP_DIR%\rinex"
+mkdir "%SBP_DIR%\%RINEX_OUT%"
 
 REM Change to the specified directory
 cd /d "%SBP_DIR%"
@@ -25,6 +28,8 @@ cd /d "%SBP_DIR%"
 REM Loop through each .sbp file in the directory
 FOR %%F IN (*.sbp) DO (
     REM Execute the sbp2rinex command on the current file
-    sbp2rinex "%%F" -d rinex
+    sbp2rinex "%%F" -d %RINEX_OUT%
 )
+
+cd /d %CWDIR%
 
