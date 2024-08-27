@@ -85,9 +85,7 @@ After completion of `.sbp`-file decoding and RTK GNSS correction, `batch_sbp2pos
 
 - `rinex/` Contains the output of `sbp2rinex`, including the `.nav` and `.obs` files corresponding to the sbp logs.
 
-- `solution/` Contains the RTKLib output with the corrected GNSS data in the form of `.pos` files. These files can be interpreted by any text editor and contain the 
-  
-  corrected position trajectories corresponding to the sbp logs. 
+- `solution/` Contains the RTKLib output with the corrected GNSS data in the form of `.pos` files. These files can be interpreted by any text editor and contain the corrected position trajectories corresponding to the sbp logs. 
 
 ### Authors
 
@@ -96,4 +94,4 @@ After completion of `.sbp`-file decoding and RTK GNSS correction, `batch_sbp2pos
 License
 --------------------
 
-This software is licensed under the terms of the [MIT license](https://github.com/chrismo-schmidt/cyclistsocialforce/blob/main/LICENSE).
+This software is licensed under the terms of the [MIT license](https://github.com/chrismo-schmidt/swiftnav_processing/blob/main/LICENSE).
