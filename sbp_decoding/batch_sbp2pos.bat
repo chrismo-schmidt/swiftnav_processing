@@ -2,7 +2,8 @@
 REM This script processes all .sbp files created by SWIFTNav in a given directory to RINEX. 
 
 REM Define in-/output directories
-SET "RINEX_OUT=rinex\bike" 
+SET "RINEX_OUT=rinex" 
+SET "REPORT_OUT=report" 
 SET "SOLUTION_OUT=solution" 
 SET "CORR_IN=correction_data"
 SET "CWDIR=%CD%"
@@ -21,7 +22,7 @@ SET "SBP_DIR=%~1"
 
 REM Check if the directory exists
 IF NOT EXIST "%SBP_DIR%" (
-    echo Created driectory: %SBP_DIR%
+    echo The given directory does not exist: %SBP_DIR%
     exit /b 1
 )
 
@@ -46,6 +47,7 @@ IF NOT EXIST "%SBP_DIR%\%CORR_IN%\*.crx" (
 :: Create output directories
 mkdir "%SBP_DIR%\%RINEX_OUT%"
 mkdir "%SBP_DIR%\%SOLUTION_OUT%"
+mkdir "%SBP_DIR%\%REPORT_OUT%"
 
 REM Change to the specified directory
 cd /d "%SBP_DIR%"
@@ -74,6 +76,11 @@ FOR %%F IN (*.sbp) DO (
 	echo Converting SBP to RINEX
     REM Execute the sbp2rinex command on the current file
     sbp2rinex "%%F" -d %RINEX_OUT%
+	
+	REM Execute the sbp2report command on the current file
+	cd %REPORT_OUT%
+    sbp2report -d "%SBP_DIR%\%%F" 
+	cd ..
 	
 	echo Applying RTK corrections
 	REM Run postprocessing on the RINEX files
