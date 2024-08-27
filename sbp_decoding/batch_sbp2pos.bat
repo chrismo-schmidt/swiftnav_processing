@@ -1,5 +1,5 @@
 @echo off
-REM This script processes all .sbp files created by SWIFTNav in a given directory to RINEX. 
+REM This script processes all .sbp files created by SWIFTNav in a given directory. 
 
 REM Define in-/output directories
 SET "RINEX_OUT=rinex" 
