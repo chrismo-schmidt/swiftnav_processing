@@ -49,7 +49,7 @@ Need help adding something to the PATH variable? Try [this guide](https://helpde
 ## Correction Data
 
 The program automatlically downloads RTK GNSS correction data from the [Dutch Permanent GNSS Array (DPGA)](https://gnss1.tudelft.nl/dpga/). 
-Per default, it opens an anonymous connection to `ftp://gnss1.tudelft.nl/` and downloads highrate RINEX data from the `DELF00NLD` station on the EwI tower at TU Delft campus. 
+Per default, it opens an anonymous connection to `ftp://gnss1.tudelft.nl/` and downloads highrate RINEX data from the `DELF00NLD` station on the EwI tower at TU Delft campus. After processing, the downloaded correction data is deleted and only a correction log file is retained. To keep correction data, use `--keepcorrectiondata`.
 
 The host adress (`--ftphost`) and GNSS base station (`--station`) can be configured manually. Note, however, that filenames are currently hard-coded to the format used by the DPGA, limiting the compatibility to data from DPGA stations younger then 2016. 
 
@@ -72,7 +72,8 @@ To run the program open a command prompt and execute the following:
   -h, --help             Show this help message and exit.
   --dir DIR              Root directory. All directories containing .sbp below this directory will be processed.
   --ftphost FTPHOST      FTP host to download correction data from. Must accept anonymous connections. The default is gnss1.tudelft.nl.
-  --corrdir CORRDIR      Correction data directory. Default is {DIR}/correction_data.
+  --corrdir CORRDIR      Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored."
+  --keepcorrectiondata   Keep correction data after processing each SBP directory; only applies when --corrdir is not used.
   --station STATION      The base station to download data from. The default is the EWI-tower (DELF00NLD).
   --connect              Suppress prompt asking for connection when downloading correction data.
   --rtkconfig RTKCONFIG  Specify the RTKLib config file. If not specified, the correction data directory is searched for a *.conf file.
@@ -90,6 +91,8 @@ After completion of `.sbp`-file decoding and RTK GNSS correction, `rtkprocessing
 - `rinex/` Contains the output of `sbp2rinex`, including the `.nav` and `.obs` files corresponding to the sbp logs.
 
 - `solution/` Contains the RTKLib output with the corrected GNSS data in the form of `.pos` files. These files can be interpreted by any text editor and contain the corrected position trajectories corresponding to the sbp logs. 
+
+- `correction/` Contains a log file of the correction process. If `--keepcorrectiondata`, also contains the correction data. 
 
 ## Old `batch_sbp2pos.bat`
 
