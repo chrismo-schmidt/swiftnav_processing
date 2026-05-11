@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
 
 from datetime import datetime, timedelta
 
@@ -209,29 +210,40 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     print(f"Using config file: {conf_file}")
     
     print("Apply RTK corrections:")
+    
+    data_files={}
+
     for sbp_file in sbp_files:
     
         fname_no_ext = os.path.splitext(sbp_file)[0]
         print(f"{fname_no_ext} ... ", end="")
 
         # Apply RTK corrections
-        pos_output = os.path.join(sbp_dir, SOLUTION_OUT, f"{fname_no_ext}.pos")
-        obs_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.obs")
-        nav_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.nav")
-        if os.path.isfile(pos_output):
+        pos_file = os.path.join(sbp_dir, SOLUTION_OUT, f"{fname_no_ext}.pos")
+        if os.path.isfile(pos_file):
             print("Found existing .pos file. Skip!")
             continue
+
+        obs_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.obs")
+        nav_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.nav")
 
         subprocess.run([
             "rnx2rtkp",
             "-k", conf_file,
-            "-o", pos_output,
+            "-o", pos_file,
             obs_file,
             os.path.join(corr_dir, "*.crx"),
             nav_file
         ], shell=True, check=True)
-        print(f"output: {pos_output}, done!")
-    
+        print(f"output: {pos_file}, done!")
+
+        data_files[fname_no_ext] = (pos_file, os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
+
+    # plotting   
+    if len(data_files) > 0:
+        fig = plot_processing_result(data_files)
+        fig_file = os.path.join(sbp_dir, "rtkprocessing_results.png")
+        fig.savefig(fig_file)
     
     # log correction 
     files_deleted = (
@@ -278,6 +290,52 @@ def get_sbp_dirs(root_dir):
     print(f"Recursive search found {len(sbp_dirs)} directories with .spb files in '{root_dir}' and subdirectories.")
 
     return sbp_dirs
+
+
+def plot_processing_result(data_files):
+
+    filekeys = list(data_files.keys())
+    filekeys.sort()
+
+    fig, ax = plt.subplots(1,1)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Longitude [deg]")
+    ax.set_ylabel("Latitude [deg]")
+    ax.xaxis.set_major_formatter("{x:.6f}")
+    ax.yaxis.set_major_formatter("{x:.6f}")
+
+    ax.set_title(f"RTK Processing Results {filekeys[0]}-{filekeys[-1]}")
+
+    #draw raw data
+    nodes = []
+    col_raw = '#C4C4C4'
+    for f in filekeys:
+        data_report = pd.read_csv(data_files[f][1])
+        lat = data_report['Lat [deg]']
+        lon = data_report['Lon [deg]']
+        line_raw, = ax.plot(lon, lat, linestyle='dashed', color=col_raw)
+        nodes.append((lon.iloc[0], lat.iloc[0]))
+    nodes.append((lon.iloc[-1], lat.iloc[-1]))
+    nodes = np.array(nodes)
+    ax.scatter(nodes[:,0], nodes[:,1], c=col_raw, marker='s')
+
+    #draw processed data
+    nodes = []
+    col_pos = '#00A6D6'
+    for f in filekeys:
+        data_report = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=24)
+        lat = data_report['latitude(deg)']
+        lon = data_report['longitude(deg)']
+        line_pos, =ax.plot(lon, lat, color=col_pos)
+        nodes.append((lon.iloc[0], lat.iloc[0]))
+    nodes.append((lon.iloc[-1], lat.iloc[-1]))
+    nodes = np.array(nodes)
+    ax.scatter(nodes[:,0], nodes[:,1], c=col_pos, marker='s')
+    ax.legend(handles=[line_raw, line_pos], labels=["raw", "processed"])
+
+    fig.set_size_inches(10,10)
+
+    return fig
 
 
 def write_correction_log(

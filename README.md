@@ -94,6 +94,8 @@ After completion of `.sbp`-file decoding and RTK GNSS correction, `rtkprocessing
 
 - `correction/` Contains a log file of the correction process. If `--keepcorrectiondata`, also contains the correction data. 
 
+- `rtkprocessing_results.png` A lat/lon plot overlaying the raw data and the processing results.
+
 ## Old `batch_sbp2pos.bat`
 
 This Python package is an elaborate update to the old bash script. It expands the scripts functions by automatically traversing directories and automatically downloading correction data. 
