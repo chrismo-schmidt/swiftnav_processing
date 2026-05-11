@@ -136,6 +136,10 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
             print(f"Couldn't find the specified correction data directory: {corr_dir}!")
             sys.exit(1)
         local_correction_data = False
+    
+    dir_correction_local = os.path.join(sbp_dir, CORR_IN)
+    os.makedirs(dir_correction_local, exist_ok=True)
+
 
     if not os.path.exists(corr_dir):
         print(f"Couldn't find the specified correction data directory: {corr_dir}!")
@@ -192,6 +196,11 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     if len(corr_filenames_missing) > 0:
         print(f"Missing {len(corr_filenames_missing)}/{len(corr_filenames)} required correction data files.")
         download_correction_files(corr_filenames_missing, host, corr_dir, suppress_download_prompt=suppress_download_prompt)
+    files_downloaded = [os.path.basename(f) for f in corr_filenames_missing]
+    files_existing = corr_filenames_existing
+    files_used = sorted(
+        set(files_existing + [os.path.basename(f) for f in corr_filenames_missing])
+    )
 
     # Check for .conf file
     if conf_file is None:
@@ -228,6 +237,24 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
         ], shell=True, check=True)
         print(f"output: {pos_output}, done!")
     
+    
+    # log correction 
+    files_deleted = (
+        files_used if local_correction_data and not keep_correction_data else []
+    )
+
+    write_correction_log(
+        dir_correction_local=dir_correction_local,
+        sbp_dirname=os.path.basename(sbp_dir),
+        rtk_conf_name=os.path.basename(conf_file),
+        correction_mode="local" if local_correction_data else "global",
+        ftp_host=host if files_downloaded else None,
+        ftp_remote_dir="rinex/highrate/",
+        files_used=files_used,
+        files_downloaded=files_downloaded,
+        files_deleted=files_deleted,
+    )
+
     # Delete correction data
     if local_correction_data and not keep_correction_data:
         print(f"Deleting correction data in {corr_dir}")
@@ -246,6 +273,59 @@ def get_sbp_dirs(root_dir):
             sbp_dirs.append(dirpath)
 
     return sbp_dirs
+
+
+def write_correction_log(
+    dir_correction_local,
+    sbp_dirname,
+    rtk_conf_name,
+    correction_mode,
+    ftp_host,
+    ftp_remote_dir,
+    files_used,
+    files_downloaded,
+    files_deleted,
+):
+    """
+    Write correction data provenance log.
+    """
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath_log = os.path.join(
+        dir_correction_local, f"correction_data_log_{timestamp}.txt"
+    )
+
+    with open(filepath_log, "w") as f:
+        f.write("RTK correction data log\n")
+        f.write(f"Timestamp: {timestamp}\n\n")
+
+        f.write(f"SBP directory: {sbp_dirname}\n")
+        f.write(f"RTK config file: {rtk_conf_name}\n\n")
+
+        f.write(f"Correction mode: {correction_mode}\n\n")
+
+        if ftp_host is not None:
+            f.write("Correction data source:\n")
+            f.write(f"  FTP server: {ftp_host}\n")
+            f.write(f"  Remote folder: {ftp_remote_dir}\n\n")
+
+        if files_downloaded:
+            f.write("Downloaded correction files:\n")
+            for fname in files_downloaded:
+                f.write(f"  {fname}\n")
+            f.write("\n")
+
+        f.write("Correction files used for RTK:\n")
+        for fname in files_used:
+            f.write(f"  {fname}\n")
+        f.write("\n")
+
+        f.write("Deleted correction files:\n")
+        if files_deleted:
+            for fname in files_deleted:
+                f.write(f"  {fname}\n")
+        else:
+            f.write("  none\n")
 
 
 def parse_args():
