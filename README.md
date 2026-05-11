@@ -71,6 +71,7 @@ To run the program open a command prompt and execute the following:
 ```
   -h, --help             Show this help message and exit.
   --dir DIR              Root directory. All directories containing .sbp below this directory will be processed.
+  --outdir DIR           Root directory of the output. If given, the subfolder structure of the root directory is repeated in the output directory and results are stored in the corresponding subfolders.. If not specified, the output is stored in the root directory. 
   --ftphost FTPHOST      FTP host to download correction data from. Must accept anonymous connections. The default is gnss1.tudelft.nl.
   --corrdir CORRDIR      Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored."
   --keepcorrectiondata   Keep correction data after processing each SBP directory; only applies when --corrdir is not used.
@@ -84,7 +85,7 @@ To run the program open a command prompt and execute the following:
 
 #### Output:
 
-After completion of `.sbp`-file decoding and RTK GNSS correction, `rtkprocessing` stores the results and intermediate results in three new subdirectories next to each `.sbp` file:
+After completion of `.sbp`-file decoding and RTK GNSS correction, `rtkprocessing` stores the results and intermediate results in three new subdirectories next to each `.sbp` file. If `--outdir` is supplied, the a filesystem identically to the filesystem in `--dir` will be created and outputs appear in the corresponding subdirectories:
 
 - `report/` Contains the output of `sbp2report`, including trajectory plots, IMU data, Google Earth files and system logs. 
 

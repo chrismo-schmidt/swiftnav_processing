@@ -31,14 +31,17 @@ def get_timespans(sbp_dir, report_subdir='report'):
 
         data = pd.read_csv(fpath)
         
-        i0 = max(data['UTC Time'].first_valid_index(), data['UTC Date'].first_valid_index())
-        i1 = min(data['UTC Time'].last_valid_index(), data['UTC Date'].last_valid_index())
-        
-        begin = f"{data['UTC Date'].iloc[i0]} {data['UTC Time'].iloc[i0]}"
-        end = f"{data['UTC Date'].iloc[i1]} {data['UTC Time'].iloc[i1]}"
+        has_data =  data['UTC Time'].notna().any() and data['UTC Date'].notna().any()
 
-        span = (datetime.strptime(begin, pattern), datetime.strptime(end, pattern))
-        timespans.append(span)
+        if has_data:
+            i0 = max(data['UTC Time'].first_valid_index(), data['UTC Date'].first_valid_index())
+            i1 = min(data['UTC Time'].last_valid_index(), data['UTC Date'].last_valid_index())
+            
+            begin = f"{data['UTC Date'].iloc[i0]} {data['UTC Time'].iloc[i0]}"
+            end = f"{data['UTC Date'].iloc[i1]} {data['UTC Time'].iloc[i1]}"
+
+            span = (datetime.strptime(begin, pattern), datetime.strptime(end, pattern))
+            timespans.append(span)
 
     return timespans
 
@@ -110,7 +113,7 @@ def download_correction_files(files, host, download_dir, suppress_download_promp
         ftp.quit()
         raise e
 
-def _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
+def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
     
     # Download correction data
     corr_filenames = get_correction_filenames(sbp_dir)
@@ -152,13 +155,13 @@ def _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppre
         print(f"{fname_no_ext} ... ", end="")
 
         # Apply RTK corrections
-        pos_file = os.path.join(sbp_dir, SOLUTION_OUT, f"{fname_no_ext}.pos")
+        pos_file = os.path.join(out_dir, SOLUTION_OUT, f"{fname_no_ext}.pos")
         if os.path.isfile(pos_file):
             print("Found existing .pos file. Skip!")
             continue
 
-        obs_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.obs")
-        nav_file = os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}.nav")
+        obs_file = os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}.obs")
+        nav_file = os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}.nav")
 
         subprocess.run([
             "rnx2rtkp",
@@ -170,11 +173,11 @@ def _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppre
         ], shell=True, check=True)
         print(f"output: {pos_file}, done!")
 
-        data_files[fname_no_ext] = (pos_file, os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
+        data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
 
     return data_files, files_downloaded, files_used, corr_filenames_missing, conf_file
 
-def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
+def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
     print(f"Processing SBP files in {sbp_dir}:")
 
     # Define in-/output directories
@@ -192,7 +195,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
 
     # Create output directories
     for folder in [RINEX_OUT, REPORT_OUT, SOLUTION_OUT]:
-        os.makedirs(os.path.join(sbp_dir, folder), exist_ok=True)
+        os.makedirs(os.path.join(out_dir, folder), exist_ok=True)
 
     # Change to sbp_dir
     os.chdir(sbp_dir)
@@ -209,19 +212,19 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
         print(f"\n{fname_no_ext}\n----------")
 
         # Convert SBP to RINEX
-        exists = [os.path.isfile(os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]]
+        exists = [os.path.isfile(os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]]
         if not np.all(exists):
             print("\nConverting SBP to RINEX ... ")
-            subprocess.run(["sbp2rinex", os.path.join(sbp_dir, sbp_file), "-d", os.path.join(sbp_dir, RINEX_OUT)], check=True)
+            subprocess.run(["sbp2rinex", os.path.join(sbp_dir, sbp_file), "-d", os.path.join(out_dir, RINEX_OUT)], check=True)
             print("done!")
         else:
             print("\nFound existing RINEX ... ")
 
         # Generate report
-        exists = [os.path.isfile(os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
+        exists = [os.path.isfile(os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
         if not np.all(exists):
             print("\nGenerating report ... ")
-            os.chdir(os.path.join(sbp_dir, REPORT_OUT))
+            os.chdir(os.path.join(out_dir, REPORT_OUT))
             subprocess.run(["sbp2report", "-d", os.path.join(sbp_dir, sbp_file)], check=True)
             os.chdir(sbp_dir)
             print("done!")
@@ -232,24 +235,24 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     if corr_dir is None:
         local_correction_data = True
         if keep_correction_data:
-            corr_dir = os.path.join(sbp_dir, CORR_OUT)
+            corr_dir = os.path.join(out_dir, CORR_OUT)
             os.makedirs(corr_dir, exist_ok=True)
-            data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+            data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
         else:
             with tempfile.TemporaryDirectory(prefix="rtkprocessing_") as corr_dir:
-                data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+                data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
     else:
         if not os.path.exists(corr_dir):
             print(f"Couldn't find the specified correction data directory: {corr_dir}!")
             sys.exit(1)
         local_correction_data = False
-        data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+        data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
 
 
     # plotting   
     if len(data_files) > 0:
         fig = plot_processing_result(data_files)
-        fig_file = os.path.join(sbp_dir, SOLUTION_OUT, "rtkprocessing_results.png")
+        fig_file = os.path.join(out_dir, SOLUTION_OUT, "rtkprocessing_results.png")
         fig.savefig(fig_file)
         plt.close(fig)
     
@@ -265,7 +268,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     )
 
     write_correction_log(
-        dir_correction_local=os.path.join(sbp_dir, SOLUTION_OUT),
+        dir_correction_local=os.path.join(out_dir, SOLUTION_OUT),
         sbp_dirname=os.path.basename(sbp_dir),
         rtk_conf_name=os.path.basename(conf_file),
         correction_mode="local" if local_correction_data else "global",
@@ -278,7 +281,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
 
     # Return to original directory
     os.chdir(cwd)
-    print(f"Finished! Results are in {os.path.join(sbp_dir, SOLUTION_OUT)}")
+    print(f"Finished! Results are in {os.path.join(out_dir, SOLUTION_OUT)}")
 
 
 def get_sbp_dirs(root_dir):
@@ -310,32 +313,43 @@ def plot_processing_result(data_files):
     nodes = []
     col_raw = '#C4C4C4'
     for f in filekeys:
-        data_report = pd.read_csv(data_files[f][1])
-        lat = data_report['Lat [deg]']
-        lon = data_report['Lon [deg]']
-        line_raw, = ax.plot(lon, lat, linestyle='dashed', color=col_raw)
-        nodes.append((lon.iloc[0], lat.iloc[0]))
-    nodes.append((lon.iloc[-1], lat.iloc[-1]))
-    nodes = np.array(nodes)
-    ax.scatter(nodes[:,0], nodes[:,1], c=col_raw, marker='s')
+        if os.path.isfile(data_files[f][1]):
+            data_report = pd.read_csv(data_files[f][1])
+            if len(data_report) > 0:
+                lat = data_report['Lat [deg]']
+                lon = data_report['Lon [deg]']
+                line_raw, = ax.plot(lon, lat, linestyle='dashed', color=col_raw)
+                nodes.append((lon.iloc[0], lat.iloc[0]))
+    if len(data_report) > 0:
+        nodes.append((lon.iloc[-1], lat.iloc[-1]))
+    if len(nodes) > 0:
+        nodes = np.array(nodes)
+        ax.scatter(nodes[:,0], nodes[:,1], c=col_raw, marker='s')
+
+    if len(nodes) > 0:
+        lat_mean = np.deg2rad(np.mean(lat))
+        ax.set_aspect(1.0 / np.cos(lat_mean))
 
     #draw processed data
-    nodes = []
+    nodes_pos = []
     col_pos = '#00A6D6'
     for f in filekeys:
-        data_report = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=24)
-        lat = data_report['latitude(deg)']
-        lon = data_report['longitude(deg)']
-        line_pos, =ax.plot(lon, lat, color=col_pos)
-        nodes.append((lon.iloc[0], lat.iloc[0]))
-    nodes.append((lon.iloc[-1], lat.iloc[-1]))
-    nodes = np.array(nodes)
-    ax.scatter(nodes[:,0], nodes[:,1], c=col_pos, marker='s')
-    ax.legend(handles=[line_raw, line_pos], labels=["raw", "processed"])
-    
-    lat_mean = np.deg2rad(np.mean(lat))
-    ax.set_aspect(1.0 / np.cos(lat_mean))
+        if os.path.isfile(data_files[f][0]):
+            data_pos = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=24)
+            if len(data_pos) > 0:
+                lat = data_pos['latitude(deg)']
+                lon = data_pos['longitude(deg)']
+                line_pos, =ax.plot(lon, lat, color=col_pos)
+                nodes_pos.append((lon.iloc[0], lat.iloc[0]))
+    if len(data_pos) > 0:
+        nodes_pos.append((lon.iloc[-1], lat.iloc[-1]))
+    if len(nodes_pos) > 0:
+        nodes_pos = np.array(nodes_pos)
+        ax.scatter(nodes_pos[:,0], nodes_pos[:,1], c=col_pos, marker='s')
 
+    if len(nodes) > 0 and len(nodes_pos) > 0:
+        ax.legend(handles=[line_raw, line_pos], labels=["raw", "processed"])
+    
     fig.set_size_inches(10,10)
 
     return fig
@@ -402,6 +416,7 @@ def parse_args():
                       "download correction data, perform RTK-GNSS correction and export to .pos.")
     )
     parser.add_argument("--dir", required = True, type=str, help="Root directory. All directories containing .sbp below this directory will be processed.")
+    parser.add_argument("--outdir", type=str, help="Root directory of the output. If given, the subfolder structure of the root directory is repeated in the output directory and results are stored in the corresponding subfolders. If not specified, the output is stored in the root directory.")
     parser.add_argument("--ftphost", type=str, default="gnss1.tudelft.nl", help="FTP host to download correction data from. Must accept anonymous connections. The default is gnss1.tudelft.nl")
     parser.add_argument("--corrdir", type=str, help="Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored.")
     parser.add_argument("--station", type=str, default="DELF00NLD", help="The base station to download data from. The default is the EWI-tower (DELF00NLD)")
@@ -429,7 +444,13 @@ def main():
         conf_file = args.rtkconfig
 
     for sbp_dir in sbp_directories:
-        process_sbp_files(sbp_dir, args.ftphost, args.station, corr_dir=corr_dir, conf_file=conf_file, suppress_download_prompt=args.connect, keep_correction_data=args.keepcorrectiondata)
+        rel_path = os.path.relpath(sbp_dir, start=args.dir)
+        
+        if args.outdir is None:
+            out_dir = sbp_dir
+        else:
+            out_dir = os.path.join(args.outdir, rel_path)
+        process_sbp_files(sbp_dir, out_dir, args.ftphost, args.station, corr_dir=corr_dir, conf_file=conf_file, suppress_download_prompt=args.connect, keep_correction_data=args.keepcorrectiondata)
 
 if __name__ == "__main__":
     main()
