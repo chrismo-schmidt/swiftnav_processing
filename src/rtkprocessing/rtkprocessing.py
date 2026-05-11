@@ -257,11 +257,11 @@ def parse_args():
     )
     parser.add_argument("--dir", required = True, type=str, help="Root directory. All directories containing .sbp below this directory will be processed.")
     parser.add_argument("--ftphost", type=str, default="gnss1.tudelft.nl", help="FTP host to download correction data from. Must accept anonymous connections. The default is gnss1.tudelft.nl")
-    parser.add_argument("--corrdir", type=str, default='{DIR}/correction_data', help="Correction data directory. Default is {DIR}/correction_data")
+    parser.add_argument("--corrdir", type=str, default='{DIR}/correction_data', help="Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored.")
     parser.add_argument("--station", type=str, default="DELF00NLD", help="The base station to download data from. The default is the EWI-tower (DELF00NLD)")
     parser.add_argument("--connect", action="store_true", help="Suppress prompt asking for connection when downloading correction data.")
     parser.add_argument("--rtkconfig", type=str, default='{DIR}/correction_data/*.conf', help="Specify the RTKLib config file. If not specified, the correction data directory is searched for a *.conf file.")
-    parser.add_argument("--keepcorrectiondata", action="store_true", help="Keep correction data after processing. Only applies when --corrdir is NOT provided. Ignored when using a global correction directory.")
+    parser.add_argument("--keepcorrectiondata", action="store_true", help="Keep correction data after processing each SBP directory; only applies when --corrdir is not used.")
 
     return parser.parse_args()
 
