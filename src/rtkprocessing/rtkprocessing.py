@@ -110,7 +110,7 @@ def download_correction_files(files, host, download_dir, suppress_download_promp
         raise e
 
 
-def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None):
+def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
     print(f"Processing SBP files in {sbp_dir}:")
 
     # Define in-/output directories
@@ -130,11 +130,12 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     if corr_dir is None:
         corr_dir = os.path.join(sbp_dir, CORR_IN)
         os.makedirs(corr_dir, exist_ok=True)
+        local_correction_data = True
     else:
         if not os.path.exists(corr_dir):
             print(f"Couldn't find the specified correction data directory: {corr_dir}!")
             sys.exit(1)
-
+        local_correction_data = False
 
     if not os.path.exists(corr_dir):
         print(f"Couldn't find the specified correction data directory: {corr_dir}!")
@@ -226,6 +227,11 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
             nav_file
         ], shell=True, check=True)
         print(f"output: {pos_output}, done!")
+    
+    # Delete correction data
+    if local_correction_data and not keep_correction_data:
+        print(f"Deleting correction data in {corr_dir}")
+        shutil.rmtree(corr_dir, ignore_errors=True)
 
     # Return to original directory
     os.chdir(cwd)
@@ -255,6 +261,7 @@ def parse_args():
     parser.add_argument("--station", type=str, default="DELF00NLD", help="The base station to download data from. The default is the EWI-tower (DELF00NLD)")
     parser.add_argument("--connect", action="store_true", help="Suppress prompt asking for connection when downloading correction data.")
     parser.add_argument("--rtkconfig", type=str, default='{DIR}/correction_data/*.conf', help="Specify the RTKLib config file. If not specified, the correction data directory is searched for a *.conf file.")
+    parser.add_argument("--keepcorrectiondata", action="store_true", help="Keep correction data after processing. Only applies when --corrdir is NOT provided. Ignored when using a global correction directory.")
 
     return parser.parse_args()
 
@@ -278,7 +285,7 @@ def main():
         conf_file = args.rtkconfig
 
     for sbp_dir in sbp_directories:
-        process_sbp_files(sbp_dir, args.ftphost, args.station, corr_dir=corr_dir, conf_file=conf_file, suppress_download_prompt=args.connect)
+        process_sbp_files(sbp_dir, args.ftphost, args.station, corr_dir=corr_dir, conf_file=conf_file, suppress_download_prompt=args.connect, keep_correction_data=args.keepcorrectiondata)
 
 if __name__ == "__main__":
     main()
