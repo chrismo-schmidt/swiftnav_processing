@@ -5,3 +5,4 @@ dependencies:
   - python>=3.11   #Should also work with other Python version. I tested 3.11
   - pandas
   - numpy
+  - matplotlib
