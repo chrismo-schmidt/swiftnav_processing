@@ -3,8 +3,8 @@ import os
 import sys
 import glob
 import subprocess
+import tempfile
 
-import os
 import pandas as pd
 import numpy as np
 import argparse
@@ -110,75 +110,8 @@ def download_correction_files(files, host, download_dir, suppress_download_promp
         ftp.quit()
         raise e
 
-
-def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
-    print(f"Processing SBP files in {sbp_dir}:")
-
-    # Define in-/output directories
-    RINEX_OUT = "rinex"
-    REPORT_OUT = "report"
-    SOLUTION_OUT = "solution"
-    CORR_IN = "correction"
-
-    cwd = os.getcwd()
-
-    # Check if directory exists
-    if not os.path.exists(sbp_dir):
-        print(f"The given directory does not exist: {sbp_dir}")
-        sys.exit(1)
-
-    # Check correction data directory
-    if corr_dir is None:
-        corr_dir = os.path.join(sbp_dir, CORR_IN)
-        os.makedirs(corr_dir, exist_ok=True)
-        local_correction_data = True
-    else:
-        if not os.path.exists(corr_dir):
-            print(f"Couldn't find the specified correction data directory: {corr_dir}!")
-            sys.exit(1)
-        local_correction_data = False
+def _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
     
-    dir_correction_local = os.path.join(sbp_dir, CORR_IN)
-    os.makedirs(dir_correction_local, exist_ok=True)
-
-    # Create output directories
-    for folder in [RINEX_OUT, REPORT_OUT, SOLUTION_OUT]:
-        os.makedirs(os.path.join(sbp_dir, folder), exist_ok=True)
-
-    # Change to sbp_dir
-    os.chdir(sbp_dir)
-
-    # Process each .sbp file
-    sbp_files = [f for f in os.listdir() if f.endswith(".sbp")]
-    if len(sbp_files)==0:
-        print("No .sbp files found in the directory.")
-        sys.exit(1)
-
-    print("Extracting SBP files:")
-    for sbp_file in sbp_files:
-        fname_no_ext = os.path.splitext(sbp_file)[0]
-        print(f"\n{fname_no_ext}\n----------")
-
-        # Convert SBP to RINEX
-        exists = [os.path.isfile(os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]]
-        if not np.all(exists):
-            print("\nConverting SBP to RINEX ... ")
-            subprocess.run(["sbp2rinex", os.path.join(sbp_dir, sbp_file), "-d", os.path.join(sbp_dir, RINEX_OUT)], check=True)
-            print("done!")
-        else:
-            print("\nFound existing RINEX ... ")
-
-        # Generate report
-        exists = [os.path.isfile(os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
-        if not np.all(exists):
-            print("\nGenerating report ... ")
-            os.chdir(os.path.join(sbp_dir, REPORT_OUT))
-            subprocess.run(["sbp2report", "-d", os.path.join(sbp_dir, sbp_file)], check=True)
-            os.chdir(sbp_dir)
-            print("done!")
-        else:
-            print("\nFound existing report ... ")
-
     # Download correction data
     corr_filenames = get_correction_filenames(sbp_dir)
     corr_filenames_missing = [cfname for cfname in corr_filenames if not os.path.isfile(os.path.join(corr_dir, os.path.splitext(cfname.split("/")[-1])[0]))]
@@ -239,11 +172,86 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
 
         data_files[fname_no_ext] = (pos_file, os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
 
+    return data_files, files_downloaded, files_used, corr_filenames_missing, conf_file
+
+def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
+    print(f"Processing SBP files in {sbp_dir}:")
+
+    # Define in-/output directories
+    RINEX_OUT = "rinex"
+    REPORT_OUT = "report"
+    SOLUTION_OUT = "solution"
+    CORR_OUT = "correction"
+
+    cwd = os.getcwd()
+
+    # Check if directory exists
+    if not os.path.exists(sbp_dir):
+        print(f"The given directory does not exist: {sbp_dir}")
+        sys.exit(1)
+
+    # Create output directories
+    for folder in [RINEX_OUT, REPORT_OUT, SOLUTION_OUT]:
+        os.makedirs(os.path.join(sbp_dir, folder), exist_ok=True)
+
+    # Change to sbp_dir
+    os.chdir(sbp_dir)
+
+    # Process each .sbp file
+    sbp_files = [f for f in os.listdir() if f.endswith(".sbp")]
+    if len(sbp_files)==0:
+        print("No .sbp files found in the directory.")
+        sys.exit(1)
+
+    print("Extracting SBP files:")
+    for sbp_file in sbp_files:
+        fname_no_ext = os.path.splitext(sbp_file)[0]
+        print(f"\n{fname_no_ext}\n----------")
+
+        # Convert SBP to RINEX
+        exists = [os.path.isfile(os.path.join(sbp_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]]
+        if not np.all(exists):
+            print("\nConverting SBP to RINEX ... ")
+            subprocess.run(["sbp2rinex", os.path.join(sbp_dir, sbp_file), "-d", os.path.join(sbp_dir, RINEX_OUT)], check=True)
+            print("done!")
+        else:
+            print("\nFound existing RINEX ... ")
+
+        # Generate report
+        exists = [os.path.isfile(os.path.join(sbp_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
+        if not np.all(exists):
+            print("\nGenerating report ... ")
+            os.chdir(os.path.join(sbp_dir, REPORT_OUT))
+            subprocess.run(["sbp2report", "-d", os.path.join(sbp_dir, sbp_file)], check=True)
+            os.chdir(sbp_dir)
+            print("done!")
+        else:
+            print("\nFound existing report ... ")
+
+    # Apply rtk corrections
+    if corr_dir is None:
+        local_correction_data = True
+        if keep_correction_data:
+            corr_dir = os.path.join(sbp_dir, CORR_OUT)
+            os.makedirs(corr_dir, exist_ok=True)
+            data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+        else:
+            with tempfile.TemporaryDirectory(prefix="rtkprocessing_") as corr_dir:
+                data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+    else:
+        if not os.path.exists(corr_dir):
+            print(f"Couldn't find the specified correction data directory: {corr_dir}!")
+            sys.exit(1)
+        local_correction_data = False
+        data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+
+
     # plotting   
     if len(data_files) > 0:
         fig = plot_processing_result(data_files)
-        fig_file = os.path.join(sbp_dir, "rtkprocessing_results.png")
+        fig_file = os.path.join(sbp_dir, SOLUTION_OUT, "rtkprocessing_results.png")
         fig.savefig(fig_file)
+        plt.close(fig)
     
     # log correction 
     files_deleted = (
@@ -257,7 +265,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     )
 
     write_correction_log(
-        dir_correction_local=dir_correction_local,
+        dir_correction_local=os.path.join(sbp_dir, SOLUTION_OUT),
         sbp_dirname=os.path.basename(sbp_dir),
         rtk_conf_name=os.path.basename(conf_file),
         correction_mode="local" if local_correction_data else "global",
@@ -267,13 +275,6 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
         files_downloaded=files_downloaded,
         files_deleted=files_deleted,
     )
-
-    # Delete correction data
-    if local_correction_data and not keep_correction_data:
-        print(f"Deleting correction data in {corr_dir}")
-        for fname in os.listdir(corr_dir):
-            if fname.endswith(".crx") or fname.endswith(".crx.gz"):
-                os.remove(os.path.join(corr_dir, fname))
 
     # Return to original directory
     os.chdir(cwd)
