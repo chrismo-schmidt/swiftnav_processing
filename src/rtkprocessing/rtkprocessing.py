@@ -129,6 +129,12 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     # Check correction data directory
     if corr_dir is None:
         corr_dir = os.path.join(sbp_dir, CORR_IN)
+        os.makedirs(corr_dir, exist_ok=True)
+    else:
+        if not os.path.exists(corr_dir):
+            print(f"Couldn't find the specified correction data directory: {corr_dir}!")
+            sys.exit(1)
+
 
     if not os.path.exists(corr_dir):
         print(f"Couldn't find the specified correction data directory: {corr_dir}!")
