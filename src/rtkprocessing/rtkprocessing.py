@@ -117,7 +117,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     RINEX_OUT = "rinex"
     REPORT_OUT = "report"
     SOLUTION_OUT = "solution"
-    CORR_IN = "correction_data"
+    CORR_IN = "correction"
 
     cwd = os.getcwd()
 
@@ -139,11 +139,6 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     
     dir_correction_local = os.path.join(sbp_dir, CORR_IN)
     os.makedirs(dir_correction_local, exist_ok=True)
-
-
-    if not os.path.exists(corr_dir):
-        print(f"Couldn't find the specified correction data directory: {corr_dir}!")
-        sys.exit(1)
 
     # Create output directories
     for folder in [RINEX_OUT, REPORT_OUT, SOLUTION_OUT]:
@@ -204,13 +199,13 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
 
     # Check for .conf file
     if conf_file is None:
-        conf_files = glob.glob(os.path.join(corr_dir, "*.conf"))
+        conf_files = glob.glob(os.path.join(sbp_dir, "*.conf"))
         if not conf_files:
-            print(f"No .conf file found in {corr_dir}")
+            print(f"No .conf file found in {sbp_dir}")
             sys.exit(1)
         conf_file = conf_files[0]
         if len(conf_files)>1:
-            warnings.warn(f"More then one config file in '{corr_dir}'! Using first.")
+            warnings.warn(f"More then one config file in '{sbp_dir}'! Using first.")
     print(f"Using config file: {conf_file}")
     
     print("Apply RTK corrections:")
@@ -242,6 +237,12 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     files_deleted = (
         files_used if local_correction_data and not keep_correction_data else []
     )
+    remote_folders = sorted(
+        {
+            os.path.join("rinex", "highrate", os.path.dirname(f).lstrip("/"))
+            for f in corr_filenames_missing
+        }
+    )
 
     write_correction_log(
         dir_correction_local=dir_correction_local,
@@ -249,7 +250,7 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
         rtk_conf_name=os.path.basename(conf_file),
         correction_mode="local" if local_correction_data else "global",
         ftp_host=host if files_downloaded else None,
-        ftp_remote_dir="rinex/highrate/",
+        ftp_remote_dir=", ".join(remote_folders) if remote_folders else None,
         files_used=files_used,
         files_downloaded=files_downloaded,
         files_deleted=files_deleted,
@@ -258,7 +259,9 @@ def process_sbp_files(sbp_dir, host, station, corr_dir=None, suppress_download_p
     # Delete correction data
     if local_correction_data and not keep_correction_data:
         print(f"Deleting correction data in {corr_dir}")
-        shutil.rmtree(corr_dir, ignore_errors=True)
+        for fname in os.listdir(corr_dir):
+            if fname.endswith(".crx") or fname.endswith(".crx.gz"):
+                os.remove(os.path.join(corr_dir, fname))
 
     # Return to original directory
     os.chdir(cwd)
@@ -271,6 +274,8 @@ def get_sbp_dirs(root_dir):
         # Check if any file in this directory ends with .sbp
         if any(fname.lower().endswith(".sbp") for fname in filenames):
             sbp_dirs.append(dirpath)
+
+    print(f"Recursive search found {len(sbp_dirs)} directories with .spb files in '{root_dir}' and subdirectories.")
 
     return sbp_dirs
 
@@ -337,10 +342,10 @@ def parse_args():
     )
     parser.add_argument("--dir", required = True, type=str, help="Root directory. All directories containing .sbp below this directory will be processed.")
     parser.add_argument("--ftphost", type=str, default="gnss1.tudelft.nl", help="FTP host to download correction data from. Must accept anonymous connections. The default is gnss1.tudelft.nl")
-    parser.add_argument("--corrdir", type=str, default='{DIR}/correction_data', help="Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored.")
+    parser.add_argument("--corrdir", type=str, help="Use a global correction data directory shared across all SBP directories; correction data is never deleted and --keepcorrectiondata is ignored.")
     parser.add_argument("--station", type=str, default="DELF00NLD", help="The base station to download data from. The default is the EWI-tower (DELF00NLD)")
     parser.add_argument("--connect", action="store_true", help="Suppress prompt asking for connection when downloading correction data.")
-    parser.add_argument("--rtkconfig", type=str, default='{DIR}/correction_data/*.conf', help="Specify the RTKLib config file. If not specified, the correction data directory is searched for a *.conf file.")
+    parser.add_argument("--rtkconfig", type=str, default='{DIR}/*.conf', help="Specify the RTKLib config file. If not specified, each sbp data directory is searched for a *.conf file.")
     parser.add_argument("--keepcorrectiondata", action="store_true", help="Keep correction data after processing each SBP directory; only applies when --corrdir is not used.")
 
     return parser.parse_args()
@@ -350,15 +355,13 @@ def main():
     args = parse_args()
     sbp_directories = get_sbp_dirs(args.dir)
 
-    if args.corrdir=='{DIR}/correction_data':
-        corr_dir = os.path.join(args.dir, "correction_data")
-        if not os.path.isdir(corr_dir):
-            os.makedirs(corr_dir)
+    if args.corrdir is None:
+        corr_dir = None
     else:
         corr_dir = args.corrdir
 
-    if args.rtkconfig=='{DIR}/correction_data/*.conf':
-        conf_file=None
+    if args.rtkconfig=='{DIR}/*.conf':
+        conf_file = None
     else:
         if not os.path.isfile(args.rtkconfig):
             raise FileNotFoundError(f"Can't find RTKLib config file at '{args.rtkconfig}'")
