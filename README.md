@@ -55,7 +55,7 @@ The host adress (`--ftphost`) and GNSS base station (`--station`) can be configu
 
 ## RTKLib Config
 
-RTKLib needs a config file for RTK GNSS correction. To create a custom config file for your needs, run `rtkpost.exe` from the RTKLib binaries and click *<u>O</u>ptions...* . After choosing the desired configuration, hit *<u>S</u>ave...* and save the config file to `DATA_DIRECTORY/correction_data/` using the filename `rtklib-swiftnav.conf`. 
+RTKLib needs a config file for RTK GNSS correction. To create a custom config file for your needs, run `rtkpost.exe` from the RTKLib binaries and click *<u>O</u>ptions...* . After choosing the desired configuration, hit *<u>S</u>ave...* and save the config file to `DATA_DIRECTORY/` using the file ending `*.conf`. 
 
 An [example configuration file](https://github.com/chris-konrad/rtkprocessing/blob/main/config/rtklib-swiftnav.conf) for SBP-files created by the SWIFTNav Piksi Multi v2 is provided in this repository. 
 
