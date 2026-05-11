@@ -299,7 +299,6 @@ def plot_processing_result(data_files):
     filekeys.sort()
 
     fig, ax = plt.subplots(1,1)
-    ax.set_aspect("equal")
     ax.set_xlabel("Longitude [deg]")
     ax.set_ylabel("Latitude [deg]")
     ax.xaxis.set_major_formatter("{x:.6f}")
@@ -333,6 +332,9 @@ def plot_processing_result(data_files):
     nodes = np.array(nodes)
     ax.scatter(nodes[:,0], nodes[:,1], c=col_pos, marker='s')
     ax.legend(handles=[line_raw, line_pos], labels=["raw", "processed"])
+    
+    lat_mean = np.deg2rad(np.mean(lat))
+    ax.set_aspect(1.0 / np.cos(lat_mean))
 
     fig.set_size_inches(10,10)
 
