@@ -17,7 +17,7 @@ import gzip
 import shutil
 import warnings
 
-def get_timespans(sbp_dir, report_subdir='report'):
+def get_timespans(out_dir, report_subdir='report'):
     """ Extract the timespan of each sbp file form the corresponding report. Requires that sbp2report has run already."""
 
     timespans = []
@@ -25,7 +25,7 @@ def get_timespans(sbp_dir, report_subdir='report'):
     pattern = r"%Y-%m-%d %H:%M:%S.%f"
 
     for fname in sbp_filenames:
-        fpath = os.path.join(sbp_dir, report_subdir, fname, fname+'.csv')
+        fpath = os.path.join(out_dir, report_subdir, fname, fname+'.csv')
         if not os.path.isfile(fpath):
             raise FileNotFoundError(f"File {fpath} does not exist!")
 
@@ -57,10 +57,10 @@ def make_corrfile_name(dt, station = 'DELF00NLD'):
     return name
 
 
-def get_correction_filenames(sbp_dir, **kwargs):
+def get_correction_filenames(out_dir, **kwargs):
     """ Get all ftp filepaths of required to """
 
-    timespans = get_timespans(sbp_dir)
+    timespans = get_timespans(out_dir)
 
     correction_files = set()
 
@@ -116,7 +116,7 @@ def download_correction_files(files, host, download_dir, suppress_download_promp
 def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
     
     # Download correction data
-    corr_filenames = get_correction_filenames(sbp_dir)
+    corr_filenames = get_correction_filenames(out_dir)
     corr_filenames_missing = [cfname for cfname in corr_filenames if not os.path.isfile(os.path.join(corr_dir, os.path.splitext(cfname.split("/")[-1])[0]))]
     corr_filenames_missing.sort()
     corr_filenames_existing = [cfname.split("/")[-1] for cfname in corr_filenames if os.path.isfile(os.path.join(corr_dir, os.path.splitext(cfname.split("/")[-1])[0]))]
@@ -152,11 +152,11 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
     for sbp_file in sbp_files:
     
         fname_no_ext = os.path.splitext(sbp_file)[0]
-        data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
         print(f"{fname_no_ext} ... ", end="")
 
         # Apply RTK corrections
         pos_file = os.path.join(out_dir, SOLUTION_OUT, f"{fname_no_ext}.pos")
+        data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
         if os.path.isfile(pos_file):
             print("Found existing .pos file. Skip!")
             continue
