@@ -152,6 +152,7 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
     print("Apply RTK corrections:")
     
     data_files={}
+    rtk_status=[]
 
     for sbp_file in sbp_files:
     
@@ -163,6 +164,7 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
         data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
         if os.path.isfile(pos_file):
             print("Found existing .pos file. Skip!")
+            rtk_status.append([fname_no_ext, "existed"])
             continue
 
         obs_file = os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}.obs")
@@ -176,9 +178,15 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
             os.path.join(corr_dir, "*.crx"),
             nav_file
         ], shell=True, check=True)
+        if os.path.isfile(pos_file):
+            rtk_status.append([fname_no_ext, "created"])
+        else:
+            rtk_status.append([fname_no_ext, "failed "])
         print(f"output: {pos_file}, done!")
 
-    return data_files, files_downloaded, files_used, corr_filenames_missing, conf_file
+    rtk_status = pd.DataFrame(rtk_status, columns=["file", "rtk"])
+
+    return data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file
 
 def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_download_prompt=False, conf_file=None, keep_correction_data=False):
     print(f"Processing SBP files in {sbp_dir}:")
@@ -191,7 +199,7 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
 
     cwd = os.getcwd()
 
-    # Check if directory exists
+    # Check if directory existed
     if not os.path.exists(sbp_dir):
         print(f"The given directory does not exist: {sbp_dir}")
         sys.exit(1)
@@ -209,30 +217,43 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
         print("No .sbp files found in the directory.")
         sys.exit(1)
 
+    logtable = []
+
     print("Extracting SBP files:")
     for sbp_file in sbp_files:
         fname_no_ext = os.path.splitext(sbp_file)[0]
         print(f"\n{fname_no_ext}\n----------")
 
         # Convert SBP to RINEX
-        exists = [os.path.isfile(os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]]
-        if not np.all(exists):
+        def exists_rinex():
+            return  np.all([os.path.isfile(os.path.join(out_dir, RINEX_OUT, f"{fname_no_ext}{ftype}")) for ftype in [".nav", ".obs", ".sbs"]])
+        if not exists_rinex():
             print("\nConverting SBP to RINEX ... ")
             subprocess.run(["sbp2rinex", os.path.join(sbp_dir, sbp_file), "-d", os.path.join(out_dir, RINEX_OUT)], check=True)
             print("done!")
+            if exists_rinex():
+                rinex_status = "created"
+            else:
+                rinex_status = "corrupt"
         else:
             print("\nFound existing RINEX ... ")
+            rinex_status = "existed"
 
         # Generate report
-        exists = [os.path.isfile(os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
-        if not np.all(exists):
+        existed = [os.path.isfile(os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}{ftype}")) for ftype in [".csv", "-ins.csv", "-msg.csv", "-trk.csv"]]
+        if not np.all(existed):
             print("\nGenerating report ... ")
             os.chdir(os.path.join(out_dir, REPORT_OUT))
             subprocess.run(["sbp2report", "-d", os.path.join(sbp_dir, sbp_file)], check=True)
             os.chdir(sbp_dir)
             print("done!")
+            report_status = "created"
         else:
             print("\nFound existing report ... ")
+            report_status = "existed"
+        
+        logtable.append([fname_no_ext, rinex_status, report_status])
+    logtable = pd.DataFrame(logtable, columns=['file', 'rinex', 'report']) 
 
     # Apply rtk corrections
     if corr_dir is None:
@@ -240,22 +261,23 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
         if keep_correction_data:
             corr_dir = os.path.join(out_dir, CORR_OUT)
             os.makedirs(corr_dir, exist_ok=True)
-            data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+            data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
         else:
             with tempfile.TemporaryDirectory(prefix="rtkprocessing_") as corr_dir:
-                data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+                data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
     else:
         if not os.path.exists(corr_dir):
             print(f"Couldn't find the specified correction data directory: {corr_dir}!")
             sys.exit(1)
         local_correction_data = False
-        data_files, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
-
+        data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+    logtable = logtable.merge(rtk_status, on="file")
 
     # plotting   
-    if len(data_files) > 0:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if len(data_files) > 0 and (logtable['rtk']=='created').any():
         fig = plot_processing_result(data_files)
-        fig_file = os.path.join(out_dir, SOLUTION_OUT, "rtkprocessing_results.png")
+        fig_file = os.path.join(out_dir, f"{timestamp}_rtkprocessing_results.png")
         fig.savefig(fig_file)
         plt.close(fig)
     
@@ -271,10 +293,12 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
     )
 
     write_correction_log(
-        dir_correction_local=os.path.join(out_dir, SOLUTION_OUT),
+        timestamp,
+        dir_correction_local=out_dir,
         sbp_dirname=os.path.basename(sbp_dir),
         rtk_conf_name=os.path.basename(conf_file),
-        correction_mode="local" if local_correction_data else "global",
+        processing_log_table=logtable,
+        correction_mode="automatic download" if local_correction_data else "user-defined correction data",
         ftp_host=host if files_downloaded else None,
         ftp_remote_dir=", ".join(remote_folders) if remote_folders else None,
         files_used=files_used,
@@ -359,9 +383,11 @@ def plot_processing_result(data_files):
 
 
 def write_correction_log(
+    timestamp, 
     dir_correction_local,
     sbp_dirname,
     rtk_conf_name,
+    processing_log_table,
     correction_mode,
     ftp_host,
     ftp_remote_dir,
@@ -373,7 +399,6 @@ def write_correction_log(
     Write correction data provenance log.
     """
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath_log = os.path.join(
         dir_correction_local, f"correction_data_log_{timestamp}.txt"
     )
@@ -385,7 +410,7 @@ def write_correction_log(
         f.write(f"SBP directory: {sbp_dirname}\n")
         f.write(f"RTK config file: {rtk_conf_name}\n\n")
 
-        f.write(f"Correction mode: {correction_mode}\n\n")
+        f.write(f"Correction data source: {correction_mode}\n\n")
 
         if ftp_host is not None:
             f.write("Correction data source:\n")
@@ -394,13 +419,19 @@ def write_correction_log(
 
         if files_downloaded:
             f.write("Downloaded correction files:\n")
-            for fname in files_downloaded:
-                f.write(f"  {fname}\n")
+            if files_downloaded:
+                for fname in files_downloaded:
+                    f.write(f"  {fname}\n")
+            else:
+                f.write("  none\n")
             f.write("\n")
 
         f.write("Correction files used for RTK:\n")
-        for fname in files_used:
-            f.write(f"  {fname}\n")
+        if files_used:
+            for fname in files_used:
+                f.write(f"  {fname}\n")
+        else:
+            f.write("  none\n")
         f.write("\n")
 
         f.write("Deleted correction files:\n")
@@ -409,6 +440,10 @@ def write_correction_log(
                 f.write(f"  {fname}\n")
         else:
             f.write("  none\n")
+        f.write("\n")
+
+        f.write("Processing Log:\n")
+        f.write(processing_log_table.to_string(index=False))
 
 
 def parse_args():
