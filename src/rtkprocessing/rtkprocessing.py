@@ -17,7 +17,7 @@ import gzip
 import shutil
 import warnings
 
-def get_timespans(out_dir, report_subdir='report'):
+def get_timespans(out_dir, report_subdir='report', solution_subdir='solution'):
     """ Extract the timespan of each sbp file form the corresponding report. Requires that sbp2report has run already."""
 
     timespans = []
@@ -25,11 +25,15 @@ def get_timespans(out_dir, report_subdir='report'):
     pattern = r"%Y-%m-%d %H:%M:%S.%f"
 
     for fname in sbp_filenames:
-        fpath = os.path.join(out_dir, report_subdir, fname, fname+'.csv')
-        if not os.path.isfile(fpath):
-            raise FileNotFoundError(f"File {fpath} does not exist!")
+        fpath_report = os.path.join(out_dir, report_subdir, fname, fname+'.csv')
+        if not os.path.isfile(fpath_report):
+            raise FileNotFoundError(f"Report file {fpath_report} does not exist!")
+        
+        fpath_pos = os.path.join(out_dir, solution_subdir, fname+'.pos')
+        if os.path.isfile(fpath_pos):
+            continue
 
-        data = pd.read_csv(fpath)
+        data = pd.read_csv(fpath_report)
         
         has_data =  data['UTC Time'].notna().any() and data['UTC Date'].notna().any()
 
