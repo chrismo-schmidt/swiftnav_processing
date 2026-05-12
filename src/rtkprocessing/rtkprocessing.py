@@ -292,19 +292,21 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
         }
     )
 
-    write_correction_log(
-        timestamp,
-        dir_correction_local=out_dir,
-        sbp_dirname=os.path.basename(sbp_dir),
-        rtk_conf_name=os.path.basename(conf_file),
-        processing_log_table=logtable,
-        correction_mode="automatic download" if local_correction_data else "user-defined correction data",
-        ftp_host=host if files_downloaded else None,
-        ftp_remote_dir=", ".join(remote_folders) if remote_folders else None,
-        files_used=files_used,
-        files_downloaded=files_downloaded,
-        files_deleted=files_deleted,
-    )
+    processed = not (logtable[['rinex', 'report', 'rtk']]=="existed").all().all() 
+    if processed:
+        write_correction_log(
+            timestamp,
+            dir_correction_local=out_dir,
+            sbp_dirname=os.path.basename(sbp_dir),
+            rtk_conf_name=os.path.basename(conf_file),
+            processing_log_table=logtable,
+            correction_mode="automatic download" if local_correction_data else "user-defined correction data",
+            ftp_host=host if files_downloaded else None,
+            ftp_remote_dir=", ".join(remote_folders) if remote_folders else None,
+            files_used=files_used,
+            files_downloaded=files_downloaded,
+            files_deleted=files_deleted,
+        )
 
     # Return to original directory
     os.chdir(cwd)
@@ -400,7 +402,7 @@ def write_correction_log(
     """
 
     filepath_log = os.path.join(
-        dir_correction_local, f"correction_data_log_{timestamp}.txt"
+        dir_correction_local, f"{timestamp}_rtkprocessing_log.txt"
     )
 
     with open(filepath_log, "w") as f:
