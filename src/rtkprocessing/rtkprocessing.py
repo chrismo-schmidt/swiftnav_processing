@@ -341,6 +341,7 @@ def plot_processing_result(data_files):
     #draw raw data
     nodes = []
     col_raw = '#C4C4C4'
+    lat_mean = None
     for f in filekeys:
         if os.path.isfile(data_files[f][1]):
             data_report = pd.read_csv(data_files[f][1])
@@ -348,15 +349,17 @@ def plot_processing_result(data_files):
                 lat = data_report['Lat [deg]']
                 lon = data_report['Lon [deg]']
                 line_raw, = ax.plot(lon, lat, linestyle='dashed', color=col_raw)
-                nodes.append((lon.iloc[0], lat.iloc[0]))
+                if not (lat.isna() & lat.isna()).all():
+                    i = max(lon.first_valid_index(), lat.first_valid_index())
+                    nodes.append((lon.iloc[i], lat.iloc[i]))
+                    lat_mean = np.deg2rad(np.mean(lat))
     if len(data_report) > 0:
         nodes.append((lon.iloc[-1], lat.iloc[-1]))
     if len(nodes) > 0:
         nodes = np.array(nodes)
         ax.scatter(nodes[:,0], nodes[:,1], c=col_raw, marker='s')
 
-    if len(nodes) > 0:
-        lat_mean = np.deg2rad(np.mean(lat))
+    if lat_mean is not None:
         ax.set_aspect(1.0 / np.cos(lat_mean))
 
     #draw processed data
