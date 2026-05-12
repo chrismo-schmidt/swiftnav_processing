@@ -152,6 +152,7 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
     for sbp_file in sbp_files:
     
         fname_no_ext = os.path.splitext(sbp_file)[0]
+        data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
         print(f"{fname_no_ext} ... ", end="")
 
         # Apply RTK corrections
@@ -172,8 +173,6 @@ def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, hos
             nav_file
         ], shell=True, check=True)
         print(f"output: {pos_file}, done!")
-
-        data_files[fname_no_ext] = (pos_file, os.path.join(out_dir, REPORT_OUT, fname_no_ext, f"{fname_no_ext}.csv"))
 
     return data_files, files_downloaded, files_used, corr_filenames_missing, conf_file
 
