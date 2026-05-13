@@ -91,10 +91,11 @@ After completion of `.sbp`-file decoding and RTK GNSS correction, `rtkprocessing
 
 - `rinex/` Contains the output of `sbp2rinex`, including the `.nav` and `.obs` files corresponding to the sbp logs.
 
-- `solution/` Contains the RTKLib output with the corrected GNSS data in the form of `.pos` files. These files can be interpreted by any text editor and contain the corrected position trajectories corresponding to the sbp logs. Also contains a log-file detailing the used correction data and a plot of the raw and processed lat/lon data. 
+- `solution/` Contains the RTKLib output with the corrected GNSS data in the form of `.pos` files. These files can be interpreted by any text editor and contain the corrected position trajectories corresponding to the sbp logs. 
 
 - `correction/` If `--keepcorrectiondata` and no correction data directory supplied, this directory contains the correction data. 
 
+Additionally, a log-file detailing the used correction data and a plot of the raw and processed lat/lon data is stored in the top-level directory. 
 
 ## Old `batch_sbp2pos.bat`
 
