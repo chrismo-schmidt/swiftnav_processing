@@ -117,10 +117,10 @@ def download_correction_files(files, host, download_dir, suppress_download_promp
         ftp.quit()
         raise e
 
-def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
+def _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, station, SOLUTION_OUT, RINEX_OUT, REPORT_OUT):
     
     # Download correction data
-    corr_filenames = get_correction_filenames(out_dir)
+    corr_filenames = get_correction_filenames(out_dir, station=station)
     corr_filenames_missing = [cfname for cfname in corr_filenames if not os.path.isfile(os.path.join(corr_dir, os.path.splitext(cfname.split("/")[-1])[0]))]
     corr_filenames_missing.sort()
     corr_filenames_existing = [cfname.split("/")[-1] for cfname in corr_filenames if os.path.isfile(os.path.join(corr_dir, os.path.splitext(cfname.split("/")[-1])[0]))]
@@ -261,16 +261,16 @@ def process_sbp_files(sbp_dir, out_dir, host, station, corr_dir=None, suppress_d
         if keep_correction_data:
             corr_dir = os.path.join(out_dir, CORR_OUT)
             os.makedirs(corr_dir, exist_ok=True)
-            data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+            data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, station, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
         else:
             with tempfile.TemporaryDirectory(prefix="rtkprocessing_") as corr_dir:
-                data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+                data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, station, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
     else:
         if not os.path.exists(corr_dir):
             print(f"Couldn't find the specified correction data directory: {corr_dir}!")
             sys.exit(1)
         local_correction_data = False
-        data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
+        data_files, rtk_status, files_downloaded, files_used, corr_filenames_missing, conf_file = _apply_rtk_corrections(sbp_dir, out_dir, sbp_files, corr_dir, conf_file, host, suppress_download_prompt, station, SOLUTION_OUT, RINEX_OUT, REPORT_OUT)
     logtable = logtable.merge(rtk_status, on="file")
 
     # plotting   
@@ -367,7 +367,7 @@ def plot_processing_result(data_files):
     col_pos = '#00A6D6'
     for f in filekeys:
         if os.path.isfile(data_files[f][0]):
-            data_pos = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=24)
+            data_pos = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=23)
             if len(data_pos) > 0:
                 lat = data_pos['latitude(deg)']
                 lon = data_pos['longitude(deg)']
