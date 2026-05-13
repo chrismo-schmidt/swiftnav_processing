@@ -367,7 +367,7 @@ def plot_processing_result(data_files):
     col_pos = '#00A6D6'
     for f in filekeys:
         if os.path.isfile(data_files[f][0]):
-            data_pos = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=23)
+            data_pos = pd.read_table(data_files[f][0], sep=r"\s+", skiprows=24)
             if len(data_pos) > 0:
                 lat = data_pos['latitude(deg)']
                 lon = data_pos['longitude(deg)']
